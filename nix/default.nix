@@ -12,7 +12,7 @@ let
   # Keep the package version in sync with `project(tsl-array-hash VERSION x.y.z)`.
   version =
     let
-      matches = map (builtins.match "project\\(tsl-array-hash VERSION ([0-9.]+)\\).*") (
+      matches = map (builtins.match "project\\(tsl-array-hash VERSION ([0-9.]+) .*") (
         lib.splitString "\n" (builtins.readFile ../CMakeLists.txt)
       );
     in

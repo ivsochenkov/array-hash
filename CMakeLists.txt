@@ -1,12 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
+project(tsl-array-hash VERSION 2.0.1 LANGUAGES CXX)
 include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-project(tsl-array-hash VERSION 0.7.2)
 
 add_library(array_hash INTERFACE)
 # Use tsl::array_hash as target, more consistent with other libraries conventions (Boost, Qt, ...)
@@ -42,7 +40,6 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tsl-array-hashConfig.cmake"
         DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/cmake/tsl-array-hash")
 
 
-
 ## Create and install tsl-array-hashTargets.cmake
 install(TARGETS array_hash
         EXPORT tsl-array-hashTargets)
@@ -69,5 +66,6 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tsl-array-hashConfigVersion.cmake"
 
 OPTION(BUILD_TESTS ON)
 if(BUILD_TESTS)
+    enable_testing()
     add_subdirectory(tests)
 endif()

@@ -47,7 +47,7 @@
           ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.gdb ];
 
           # Typical workflow inside the shell:
-          #   cmake -S . -B build -G Ninja -DBUILD_TESTS=ON
+          #   cmake -S . -B build -DBUILD_TESTS=ON
           #   cmake --build build && ./build/tests/tsl_array_hash_tests
         };
       });

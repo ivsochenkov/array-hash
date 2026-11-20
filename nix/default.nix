@@ -50,8 +50,6 @@ stdenv.mkDerivation {
 
   doCheck = withTests;
 
-  # The top-level CMakeLists.txt never calls enable_testing(), so `ctest` would
-  # find nothing. Run the test binary directly instead.
   checkPhase = ''
     runHook preCheck
     ./tests/tsl_array_hash_tests

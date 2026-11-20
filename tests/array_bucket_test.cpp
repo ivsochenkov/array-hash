@@ -53,8 +53,31 @@ using test_types = boost::mpl::list<
                                          tsl::ah::str_equal<char16_t>,
                                          std::uint32_t, false
                                          , ::std::allocator<char16_t>
-                                         > 
+                                         >
     >;
+
+/**
+ * A bucket doesn't store its allocator and has to be cleared by its owner with
+ * clear(alloc) before being destroyed. This holder owns the allocator and the
+ * bucket and clears the bucket on destruction (also when a BOOST_REQUIRE
+ * throws).
+ */
+template <class ABucket>
+struct bucket_holder {
+  using allocator_type = typename ABucket::char_allocator;
+
+  bucket_holder() : alloc(), bucket() {}
+  explicit bucket_holder(std::size_t reserved_bytes)
+      : alloc(), bucket(alloc, reserved_bytes) {}
+  ~bucket_holder() { bucket.clear(alloc); }
+
+  bucket_holder(const bucket_holder&) = delete;
+  bucket_holder& operator=(const bucket_holder&) = delete;
+
+  // alloc has to be declared before bucket.
+  allocator_type alloc;
+  ABucket bucket;
+};
 
 /**
  * insert and erase
@@ -66,7 +89,9 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_insert, ABucket, test_types) {
   using mapped_tt = typename ABucket::mapped_type;
   using key_equal = typename ABucket::key_equal;
 
-  ABucket bucket;
+  bucket_holder<ABucket> holder;
+  auto& alloc = holder.alloc;
+  ABucket& bucket = holder.bucket;
 
   // insert `nb_values` values
   const std::size_t nb_values = 1000;
@@ -76,7 +101,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_insert, ABucket, test_types) {
     auto it_find = bucket.find_or_end_of_bucket(key.data(), key.size());
     BOOST_REQUIRE(!it_find.second);
 
-    auto it_insert = bucket.append(it_find.first, key.data(), key.size(),
+    auto it_insert = bucket.append(alloc, it_find.first, key.data(), key.size(),
                                    utils::get_value<mapped_tt>(i));
     BOOST_CHECK(key_equal()(it_insert.key(), it_insert.key_size(), key.data(),
                             key.size()));
@@ -98,7 +123,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_insert, ABucket, test_types) {
   // Remove half value
   for (i = 0; i < nb_values; i += 2) {
     const auto key = utils::get_key<char_tt>(i);
-    BOOST_CHECK(bucket.erase(key.data(), key.size()));
+    BOOST_CHECK(bucket.erase(alloc, key.data(), key.size()));
   }
 
   // Check values
@@ -116,7 +141,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_insert, ABucket, test_types) {
   // Remove second half
   for (i = 1; i < nb_values; i += 2) {
     const auto key = utils::get_key<char_tt>(i);
-    BOOST_CHECK(bucket.erase(key.data(), key.size()));
+    BOOST_CHECK(bucket.erase(alloc, key.data(), key.size()));
   }
 
   BOOST_CHECK_EQUAL(std::distance(bucket.begin(), bucket.end()), 0);
@@ -141,7 +166,8 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_append_in_reserved, ABucket, test_types) {
         ABucket::entry_required_bytes(utils::get_key<char_tt>(i).size());
   }
 
-  ABucket bucket(required_size);
+  bucket_holder<ABucket> holder(required_size);
+  ABucket& bucket = holder.bucket;
 
   for (std::size_t i = 0; i < nb_values; i++) {
     const auto key = utils::get_key<char_tt>(i);
@@ -171,7 +197,9 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_erase_all, ABucket, test_types) {
   using mapped_tt = typename ABucket::mapped_type;
   using key_equal = typename ABucket::key_equal;
 
-  ABucket bucket;
+  bucket_holder<ABucket> holder;
+  auto& alloc = holder.alloc;
+  ABucket& bucket = holder.bucket;
 
   // insert `nb_values` values
   std::size_t nb_values = 1000;
@@ -181,7 +209,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_erase_all, ABucket, test_types) {
     auto it_find = bucket.find_or_end_of_bucket(key.data(), key.size());
     BOOST_REQUIRE(!it_find.second);
 
-    auto it_insert = bucket.append(it_find.first, key.data(), key.size(),
+    auto it_insert = bucket.append(alloc, it_find.first, key.data(), key.size(),
                                    utils::get_value<mapped_tt>(i));
     BOOST_CHECK(key_equal()(it_insert.key(), it_insert.key_size(), key.data(),
                             key.size()));
@@ -190,7 +218,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_erase_all, ABucket, test_types) {
   // erase all values
   auto it_erase = bucket.cbegin();
   while (it_erase != bucket.cend()) {
-    it_erase = bucket.erase(it_erase);
+    it_erase = bucket.erase(alloc, it_erase);
     BOOST_CHECK_EQUAL(std::distance(bucket.begin(), bucket.end()), --nb_values);
   }
 
@@ -205,8 +233,10 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_erase_all, ABucket, test_types) {
 BOOST_AUTO_TEST_CASE(test_iterator_empty_bucket) {
   using ABucket =
       tsl::detail_array_hash::array_bucket<char, void, tsl::ah::str_equal<char>,
-                                           std::uint16_t, true>;
-  ABucket bucket;
+                                           std::uint16_t, true,
+                                           std::allocator<char>>;
+  bucket_holder<ABucket> holder;
+  ABucket& bucket = holder.bucket;
 
   BOOST_CHECK(bucket.empty());
   BOOST_CHECK_EQUAL(std::distance(bucket.begin(), bucket.end()), 0);
@@ -224,10 +254,13 @@ BOOST_AUTO_TEST_CASE(test_key_equal) {
   // different case
   using ABucket =
       tsl::detail_array_hash::array_bucket<wchar_t, void, ci_str_equal<wchar_t>,
-                                           std::uint8_t, false>;
+                                           std::uint8_t, false,
+                                           std::allocator<wchar_t>>;
   using key_equal = typename ABucket::key_equal;
 
-  ABucket bucket;
+  bucket_holder<ABucket> holder;
+  auto& alloc = holder.alloc;
+  ABucket& bucket = holder.bucket;
 
   const std::size_t nb_values = 1000;
   for (std::size_t i = 0; i < nb_values; i++) {
@@ -236,7 +269,8 @@ BOOST_AUTO_TEST_CASE(test_key_equal) {
     auto it_find = bucket.find_or_end_of_bucket(key.data(), key.size());
     BOOST_REQUIRE(!it_find.second);
 
-    auto it_insert = bucket.append(it_find.first, key.data(), key.size());
+    auto it_insert =
+        bucket.append(alloc, it_find.first, key.data(), key.size());
     BOOST_CHECK(key_equal()(it_insert.key(), it_insert.key_size(), key.data(),
                             key.size()));
   }

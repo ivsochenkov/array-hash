@@ -1,0 +1,12 @@
+.idea/
+*.pyc
+*.arpa
+*.user
+*.tar.gz
+
+
+*.egg-info/
+build/
+*.so
+*.code-workspace
+.vscode/

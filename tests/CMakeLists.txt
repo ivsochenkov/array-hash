@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(tsl_array_hash_tests)
-
 add_executable(tsl_array_hash_tests "main.cpp" 
                                     "array_bucket_test.cpp" 
                                     "array_map_tests.cpp" 
@@ -18,9 +16,10 @@ endif()
 
 # Boost::unit_test_framework
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.54.0 REQUIRED COMPONENTS unit_test_framework)
+find_package(Boost 1.75 REQUIRED CONFIG COMPONENTS filesystem unit_test_framework)
 target_link_libraries(tsl_array_hash_tests PRIVATE Boost::unit_test_framework)   
 
 # tsl::array_hash
-add_subdirectory(../ ${CMAKE_CURRENT_BINARY_DIR}/tsl)
 target_link_libraries(tsl_array_hash_tests PRIVATE tsl::array_hash)  
+
+ADD_TEST(tsl_array_hash_test tsl_array_hash_tests)

@@ -31,19 +31,30 @@
 BOOST_AUTO_TEST_SUITE(test_array_bucket)
 using test_types = boost::mpl::list<
     tsl::detail_array_hash::array_bucket<
-        char, std::uint64_t, tsl::ah::str_equal<char>, std::uint16_t, true>,
+        char, std::uint64_t, tsl::ah::str_equal<char>, std::uint16_t, true
+                                        , ::std::allocator<char> 
+                                        >,
     tsl::detail_array_hash::array_bucket<wchar_t, std::uint32_t,
                                          tsl::ah::str_equal<wchar_t>,
-                                         std::uint8_t, true>,
+                                         std::uint8_t, true
+                                         , ::std::allocator<wchar_t>
+                                         >,
     tsl::detail_array_hash::array_bucket<char16_t, std::uint32_t,
                                          tsl::ah::str_equal<char16_t>,
-                                         std::uint8_t, true>,
+                                         std::uint8_t, true
+                                         , ::std::allocator<char16_t>
+                                         >,
     tsl::detail_array_hash::array_bucket<char32_t, std::uint8_t,
                                          tsl::ah::str_equal<char32_t>,
-                                         std::uint32_t, true>,
+                                         std::uint32_t, true
+                                         , ::std::allocator<char32_t>
+                                         >,
     tsl::detail_array_hash::array_bucket<char16_t, std::uint16_t,
                                          tsl::ah::str_equal<char16_t>,
-                                         std::uint32_t, false> >;
+                                         std::uint32_t, false
+                                         , ::std::allocator<char16_t>
+                                         > 
+    >;
 
 /**
  * insert and erase

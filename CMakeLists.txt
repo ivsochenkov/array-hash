@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.10)
 include(GNUInstallDirs)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(tsl-array-hash VERSION 0.7.2)
 
@@ -62,3 +67,8 @@ set(CMAKE_SIZEOF_VOID_P ${CMAKE_SIZEOF_VOID_P_BACKUP})
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tsl-array-hashConfigVersion.cmake"
         DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/cmake/tsl-array-hash")
+
+OPTION(BUILD_TESTS ON)
+if(BUILD_TESTS)
+    add_subdirectory(tests)
+endif()

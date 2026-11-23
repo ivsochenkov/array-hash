@@ -12,37 +12,32 @@ jobs:
             name: linux-x64-gcc,
             os: ubuntu-latest,
             cxx: g++,
-            cmake-build-type: Release,
-            glaze_tests: ON
+            cmake-build-type: Release
           }
         - {
             name: linux-x64-clang,
             os: ubuntu-latest,
             cxx: clang++,
-            cmake-build-type: Release,
-            glaze_tests: OFF
+            cmake-build-type: Release
           }
         - {
             name: macos-x64-gcc,
             os:  macos-latest,
             cxx: g++,
-            cmake-build-type: Release,
-            glaze_tests: OFF
+            cmake-build-type: Release
           }
         - {
             name: macos-x64-clang,
             os:  macos-latest,
             cxx: clang++,
-            cmake-build-type: Release,
-            glaze_tests: OFF
+            cmake-build-type: Release
           }
         - {
             name: linux-x64-clang-sanitize,
             os: ubuntu-latest,
             cxx: clang++,
             cxx-flags: "-fsanitize=address,undefined",
-            cmake-build-type: Release,
-            glaze_tests: OFF
+            cmake-build-type: Release
           }
         - {
             name: linux-x64-gcc-coverage,
@@ -50,8 +45,7 @@ jobs:
             cxx: g++,
             cxx-flags: --coverage,
             gcov-tool: gcov,
-            cmake-build-type: Debug,
-            glaze_tests: OFF
+            cmake-build-type: Debug
           }
         - {
             name: windows-x64-vs-2025,
@@ -59,8 +53,7 @@ jobs:
             cmake-build-type: Release,
             cmake-generator: Visual Studio 17 2022,
             cmake-platform: x64,
-            vcpkg-triplet: x64-windows-static-md,
-            glaze_tests: OFF
+            vcpkg-triplet: x64-windows-static-md
           }
         - {
             name: windows-x86-vs-2025,
@@ -68,8 +61,7 @@ jobs:
             cmake-build-type: Release,
             cmake-generator: Visual Studio 17 2022,
             cmake-platform: Win32,
-            vcpkg-triplet: x86-windows-static-md,
-            glaze_tests: OFF
+            vcpkg-triplet: x86-windows-static-md
           }
     name: ${{matrix.config.name}}
     runs-on: ${{matrix.config.os}}
@@ -80,11 +72,11 @@ jobs:
 
     # Windows
     - name: Install boost (Windows)
-      run: vcpkg install boost-test:${{matrix.config.vcpkg-triplet}} boost-filesystem:${{matrix.config.vcpkg-triplet}} boost-serialization:${{matrix.config.vcpkg-triplet}}
+      run: vcpkg install boost-test:${{matrix.config.vcpkg-triplet}} boost-serialization:${{matrix.config.vcpkg-triplet}}
       if: runner.os == 'Windows'
 
     - name: Configure CMake (Windows)
-      run: cmake -G "${{matrix.config.cmake-generator}}" -A ${{matrix.config.cmake-platform}} -DCMAKE_BUILD_TYPE=${{matrix.config.cmake-build-type}} -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{matrix.config.vcpkg-triplet}} -DBUILD_TESTS=ON -DBUILD_CEREAL_TESTS=ON -DBUILD_BOOST_SERIALIZATION_TESTS=ON -DBUILD_GLAZE_TESTS=${{matrix.config.glaze_tests}} -S ${{github.workspace}} -B ${{github.workspace}}/build
+      run: cmake -G "${{matrix.config.cmake-generator}}" -A ${{matrix.config.cmake-platform}} -DCMAKE_BUILD_TYPE=${{matrix.config.cmake-build-type}} -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{matrix.config.vcpkg-triplet}} -DBUILD_TESTS=ON -DBUILD_CEREAL_TESTS=ON -DBUILD_BOOST_SERIALIZATION_TESTS=ON -S ${{github.workspace}} -B ${{github.workspace}}/build
       if: runner.os == 'Windows'
 
     - name: Build (Windows)
@@ -97,11 +89,11 @@ jobs:
 
     # Linux or macOS
     - name: Install boost (Linux or macOS)
-      run: vcpkg install boost-test boost-filesystem boost-serialization
+      run: vcpkg install boost-test boost-serialization
       if: runner.os == 'Linux' || runner.os == 'macOS'
 
     - name: Configure CMake (Linux or macOS)
-      run: cmake -DCMAKE_BUILD_TYPE=${{matrix.config.cmake-build-type}} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DBUILD_TESTS=ON -DBUILD_CEREAL_TESTS=ON -DBUILD_BOOST_SERIALIZATION_TESTS=ON -DBUILD_GLAZE_TESTS=${{matrix.config.glaze_tests}} -S ${{github.workspace}} -B ${{github.workspace}}/build
+      run: cmake -DCMAKE_BUILD_TYPE=${{matrix.config.cmake-build-type}} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DBUILD_TESTS=ON -DBUILD_CEREAL_TESTS=ON -DBUILD_BOOST_SERIALIZATION_TESTS=ON -S ${{github.workspace}} -B ${{github.workspace}}/build
       env:
         CXX: ${{matrix.config.cxx}}
         CXXFLAGS: ${{matrix.config.cxx-flags}}

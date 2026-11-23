@@ -237,8 +237,9 @@ class array_map {
             std::forward_iterator_tag,
             typename std::iterator_traits<InputIt>::iterator_category>::value) {
       const auto nb_elements_insert = std::distance(first, last);
-      const std::size_t nb_free_buckets =
-          std::size_t(float(bucket_count()) * max_load_factor()) - size();
+      const size_type max_load_threshold = m_ht.max_load_threshold();
+      const size_type nb_free_buckets =
+          max_load_threshold > size() ? max_load_threshold - size() : 0;
 
       if (nb_elements_insert > 0 &&
           nb_free_buckets < std::size_t(nb_elements_insert)) {

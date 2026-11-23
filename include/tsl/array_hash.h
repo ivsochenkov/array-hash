@@ -1190,10 +1190,16 @@ class array_hash : private value_container<T, rebind_alloc_t<Allocator, CharT>>,
       throw std::length_error("The map exceeds its maximum bucket count.");
     }
 
+    // Validate before allocating the bucket array so a rejected value cannot
+    // leak the raw bucket allocation during a failed construction.
+    const float validated_max_load_factor =
+        validate_max_load_factor(max_load_factor);
+
     m_buckets = allocate_bucket_array(bucket_count);
     m_bucket_count = bucket_count;
-
-    this->max_load_factor(max_load_factor);
+    m_max_load_factor = validated_max_load_factor;
+    m_load_threshold = calculate_load_threshold(
+        m_bucket_count, m_max_load_factor);
   }
 
   array_hash(const array_hash& other)
@@ -1359,7 +1365,7 @@ class array_hash : private value_container<T, rebind_alloc_t<Allocator, CharT>>,
     clear_old_erased_values();
     value_container_type::shrink_to_fit();
 
-    rehash_impl(size_type(std::ceil(float(size()) / max_load_factor())));
+    rehash_impl(min_bucket_count_for_size(size()));
   }
 
   /*
@@ -1654,20 +1660,34 @@ class array_hash : private value_container<T, rebind_alloc_t<Allocator, CharT>>,
 
   float max_load_factor() const { return m_max_load_factor; }
 
+  // Used by array_map/array_set to estimate free capacity without repeating
+  // potentially overflowing floating-point arithmetic.
+  size_type max_load_threshold() const noexcept { return m_load_threshold; }
+
+  /**
+   * Set the maximum load factor. Values below MIN_MAX_LOAD_FACTOR are clamped
+   * to that minimum. NaN and infinities are rejected. If the computed load
+   * threshold is larger than size_type can represent, it is saturated at
+   * size_type's maximum to avoid an out-of-range floating-point conversion.
+   */
   void max_load_factor(float ml) {
-    const float min_max_load_factor = MIN_MAX_LOAD_FACTOR;
-    m_max_load_factor = std::max(min_max_load_factor, ml);
-    m_load_threshold = size_type(float(bucket_count()) * m_max_load_factor);
+    const float validated_max_load_factor = validate_max_load_factor(ml);
+    const size_type load_threshold = calculate_load_threshold(
+        bucket_count(), validated_max_load_factor);
+
+    // Commit only after validation/calculation succeeds, preserving the
+    // previous policy if the input is invalid.
+    m_max_load_factor = validated_max_load_factor;
+    m_load_threshold = load_threshold;
   }
 
   void rehash(size_type count) {
-    count = std::max(count,
-                     size_type(std::ceil(float(size()) / max_load_factor())));
+    count = std::max(count, min_bucket_count_for_size(size()));
     rehash_impl(count);
   }
 
   void reserve(size_type count) {
-    rehash(size_type(std::ceil(float(count) / max_load_factor())));
+    rehash(min_bucket_count_for_size(count));
   }
 
   /*
@@ -2120,6 +2140,54 @@ class array_hash : private value_container<T, rebind_alloc_t<Allocator, CharT>>,
 
   static constexpr float DEFAULT_CLEAR_OLD_ERASED_VALUE_THRESHOLD = 0.6f;
   static constexpr float REHASH_CLEAR_OLD_ERASED_VALUE_THRESHOLD = 0.9f;
+
+  static float validate_max_load_factor(float max_load_factor) {
+    if (!std::isfinite(max_load_factor)) {
+      throw std::invalid_argument(
+          "max_load_factor must be a finite floating-point value.");
+    }
+
+    const float min_max_load_factor = MIN_MAX_LOAD_FACTOR;
+    return max_load_factor < min_max_load_factor ? min_max_load_factor
+                                                 : max_load_factor;
+  }
+
+  static size_type calculate_load_threshold(size_type bucket_count,
+                                            float max_load_factor) noexcept {
+    const long double threshold =
+        static_cast<long double>(bucket_count) *
+        static_cast<long double>(max_load_factor);
+    const long double max_threshold = static_cast<long double>(
+        std::numeric_limits<size_type>::max());
+
+    // Use >= because long double may have less precision than size_type on
+    // some platforms (for example, MSVC where long double is double). This
+    // deliberately saturates conservatively and keeps the cast well-defined.
+    if (threshold >= max_threshold) {
+      return std::numeric_limits<size_type>::max();
+    }
+
+    return static_cast<size_type>(threshold);
+  }
+
+  size_type min_bucket_count_for_size(size_type nb_elements) const {
+    const long double required_bucket_count = std::ceil(
+        static_cast<long double>(nb_elements) /
+        static_cast<long double>(m_max_load_factor));
+    const long double max_bucket_count_value = static_cast<long double>(
+        std::numeric_limits<size_type>::max());
+
+    // Keep the conversion below size_type's representable range. The
+    // comparison is conservative on platforms where long double has fewer
+    // value bits than size_type.
+    if (!std::isfinite(required_bucket_count) ||
+        required_bucket_count >= max_bucket_count_value) {
+      throw std::length_error(
+          "The requested size requires too many buckets.");
+    }
+
+    return static_cast<size_type>(required_bucket_count);
+  }
 
   /**
    * Move all the elements of other (whose allocator is not equal to ours, so

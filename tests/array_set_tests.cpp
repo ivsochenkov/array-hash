@@ -25,11 +25,34 @@
 
 #include <boost/mpl/list.hpp>
 #include <boost/test/unit_test.hpp>
+#include <limits>
+#include <stdexcept>
+#include <string>
 #include <tuple>
+#include <vector>
 
 #include "utils.h"
 
 BOOST_AUTO_TEST_SUITE(test_array_set)
+
+BOOST_AUTO_TEST_CASE(test_max_load_factor_validation) {
+  const float infinity = std::numeric_limits<float>::infinity();
+  const float nan = std::numeric_limits<float>::quiet_NaN();
+  const float original_max_load_factor = 2.0f;
+  const float very_large = std::numeric_limits<float>::max();
+
+  tsl::array_set<char> set(8);
+  BOOST_CHECK_EQUAL(set.max_load_factor(), original_max_load_factor);
+  BOOST_CHECK_THROW(set.max_load_factor(infinity), std::invalid_argument);
+  BOOST_CHECK_THROW(set.max_load_factor(-infinity), std::invalid_argument);
+  BOOST_CHECK_THROW(set.max_load_factor(nan), std::invalid_argument);
+  BOOST_CHECK_EQUAL(set.max_load_factor(), original_max_load_factor);
+
+  set.max_load_factor(very_large);
+  const std::vector<std::string> keys = {"alpha", "beta"};
+  set.insert(keys.begin(), keys.end());
+  BOOST_CHECK_EQUAL(set.size(), keys.size());
+}
 
 using test_types = boost::mpl::list<
     tsl::array_set<char>, tsl::array_set<wchar_t>, tsl::array_set<char16_t>,

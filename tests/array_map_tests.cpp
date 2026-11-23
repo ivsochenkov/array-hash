@@ -27,10 +27,12 @@
 #include <boost/test/unit_test.hpp>
 #include <cstdint>
 #include <iterator>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #include "utils.h"
 
@@ -97,6 +99,32 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_insert, AMap, test_types) {
     BOOST_CHECK(map.key_eq()(it.key(), it.key_size(), key.c_str(), key.size()));
     BOOST_CHECK_EQUAL(*it, utils::get_value<value_tt>(i));
   }
+}
+
+BOOST_AUTO_TEST_CASE(test_max_load_factor_validation) {
+  const float infinity = std::numeric_limits<float>::infinity();
+  const float nan = std::numeric_limits<float>::quiet_NaN();
+  const float original_max_load_factor = 2.0f;
+
+  tsl::array_map<char, int> map(8);
+  BOOST_CHECK_EQUAL(map.max_load_factor(), original_max_load_factor);
+  BOOST_CHECK_THROW(map.max_load_factor(infinity), std::invalid_argument);
+  BOOST_CHECK_THROW(map.max_load_factor(-infinity), std::invalid_argument);
+  BOOST_CHECK_THROW(map.max_load_factor(nan), std::invalid_argument);
+  BOOST_CHECK_EQUAL(map.max_load_factor(), original_max_load_factor);
+
+  // A finite value whose bucket-count product cannot fit in size_type must
+  // not cause an out-of-range floating-point-to-integer conversion.
+  const float very_large = std::numeric_limits<float>::max();
+  map.max_load_factor(very_large);
+  BOOST_CHECK_EQUAL(map.max_load_factor(), very_large);
+
+  const std::vector<std::pair<std::string, int> > values = {
+      {"one", 1}, {"two", 2}};
+  map.insert(values.begin(), values.end());
+  BOOST_CHECK_EQUAL(map.size(), values.size());
+  BOOST_CHECK_EQUAL(map.at("one"), 1);
+  BOOST_CHECK_EQUAL(map.at("two"), 2);
 }
 
 BOOST_AUTO_TEST_CASE(test_insert_more_than_max_size) {

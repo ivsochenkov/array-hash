@@ -16,7 +16,7 @@ A **benchmark** of `tsl::array_map` against other hash maps can be found [here](
 
 ### Overview
 
-- Header-only library, just add the [include](include/) directory to your include path and you are ready to go. If you use CMake, you can also use the `tsl::array_hash` exported target from the [CMakeLists.txt](CMakeLists.txt).
+- Header-only library, just add the [include](include/) directory to your include path and you are ready to go. If you use CMake, you can also use the `tsl::array_hash` exported target from the [CMakeLists.txt](CMakeLists.txt). The target exports its C++11 language requirement to consumers.
 - Low memory usage with good performances, see the [benchmark](https://tessil.github.io/2016/08/29/benchmark-hopscotch-map.html) for some numbers.
 - Support for move-only and non-default constructible values.
 - Strings with null characters inside them are supported (you can thus store binary data as key).
@@ -37,6 +37,11 @@ A **benchmark** of `tsl::array_map` against other hash maps can be found [here](
 
 
 These differences also apply between `std::unordered_set` and `tsl::array_set`.
+
+The `max_load_factor()` setter accepts only finite values: NaN and positive or
+negative infinity throw `std::invalid_argument`. Finite values below the internal
+minimum (0.1) are clamped to that minimum. If a finite value would make the cached
+load threshold exceed `size_type`, the threshold is saturated at its maximum value.
 
 Thread-safety and exception guarantees are similar to the STL containers.
 
@@ -112,18 +117,23 @@ If the project has been installed through `make install`, you can also use `find
 
 The code should work with any C++11 standard-compliant compiler and has been tested with GCC 4.8.4, Clang 3.5.0 and Visual Studio 2015.
 
-To run the tests you will need the Boost Test library and CMake. 
+To build and run the core test suite you will need CMake and the Boost.Test library:
 
 ```bash
 git clone https://github.com/Tessil/array-hash.git
-cd array-hash/tests
+cd array-hash
 mkdir build
 cd build
-cmake ..
+cmake -DBUILD_TESTS=ON ..
 cmake --build .
-./tsl_array_hash_tests
+ctest --output-on-failure
 ```
 
+The optional Cereal and Boost.Serialization adapter tests can be enabled with
+`BUILD_CEREAL_TESTS=ON` and `BUILD_BOOST_SERIALIZATION_TESTS=ON`, respectively. The
+Cereal tests require either an installed Cereal package or the `third_party/cereal`
+submodule. Boost.Serialization tests additionally require the Boost.Serialization
+library. Neither dependency is required by the core library or the core test suite.
 
 
 ### Usage
@@ -212,6 +222,26 @@ struct deserializer {
 ```
 
 Note that the implementation leaves binary compatibility (endianness, float binary representation, size of int, ...) of the types it serializes/deserializes in the hands of the provided function objects if compatibility is required.
+
+The serialization protocol stores bucket data as raw character buffers. When loading,
+use the same `CharT`, `KeySizeT` and `StoreNullTerminator` settings as the writer. For
+`array_map`, also use the same `IndexSizeT` because value indices are stored in the
+bucket buffers; for `array_set`, the destination `IndexSizeT` must be able to
+represent the serialized element count. The mapped type `T` must be the same for a
+map. The archive does not encode C++ type information or perform schema migration.
+
+The default `hash_compatible = false` path recalculates hashes, so the destination
+`Hash` and `GrowthPolicy` do not need to match the writer. The faster
+`hash_compatible = true` path requires compatible `Hash`, `KeyEqual`, `GrowthPolicy`,
+`StoreNullTerminator`, `KeySizeT` and (for maps) `IndexSizeT` behavior, including the
+same hash behavior on the current platform. Do not set it to `true` merely because the
+container template types look similar.
+
+The current implementation does not preserve runtime state in custom hash/equality
+functors. Static deserialization default-constructs `Hash`, and `KeyEqual` is invoked
+through a default-constructed instance; stateful `Hash` values are therefore not
+restored, and stateful `KeyEqual` is not supported. Use stateless functors with the
+provided deserialization APIs.
 
 More details regarding the `serialize` and `deserialize` methods can be found in the [API](https://tessil.github.io/array-hash/doc/html/classtsl_1_1array__map.html).
 
@@ -336,9 +366,13 @@ map_type restored;
 
 The adapter supports both `array_map` and `array_set`, including the
 `array_pg_map` / `array_pg_set` aliases and custom template parameters. Cereal is
-header-only. In a regular Git checkout, initialize the pinned dependency with
-`git submodule update --init --recursive`. Nix builds use the `cereal` package from
-nixpkgs instead, so the source submodule is not needed for Nix builds.
+header-only. In a regular Git checkout, initialize the submodule at the commit
+recorded by the parent repository with `git submodule update --init --recursive`.
+The submodule is configured to follow the upstream `master` branch when updating;
+to move it to the latest branch tip, run
+`git submodule update --init --remote third_party/cereal` and commit the resulting
+gitlink update in your repository. Nix builds use the `cereal` package from nixpkgs
+instead, so the source submodule is not needed for Nix builds.
 
 ##### Serialization with Boost.Serialization
 
@@ -372,10 +406,15 @@ map_type restored;
 
 Both adapters use `hash_compatible = false` when deserializing, so hashes are
 recomputed for the destination container's hash function and growth policy. The
-archive stores the container's existing serialization protocol; use the same
-`CharT` and mapped type `T` when loading. As with the low-level API, binary
-compatibility of the serialized types is the responsibility of the selected archive
-and its configuration.
+archive stores the container's existing serialization protocol; preserve the bucket
+layout template parameters described in the low-level serialization section above.
+As with the low-level API, binary compatibility of the serialized types is the
+responsibility of the selected archive and its configuration.
+
+The current Cereal and Boost adapters default-construct each mapped value before
+loading it from the archive. Consequently, loading through these adapters requires a
+default-constructible mapped type `T`, even though the core container itself supports
+non-default-constructible mapped types with a suitable custom deserializer.
 
 The two adapters are independent: include only the header for the serialization
 library used by your application. For CMake consumers, also link `cereal::cereal` or
@@ -386,62 +425,6 @@ For developers building the optional adapter tests, enable `BUILD_CEREAL_TESTS` 
 `BUILD_BOOST_SERIALIZATION_TESTS` when configuring CMake. The Cereal tests use an
 installed Cereal package when available, or the `third_party/cereal` submodule. The Nix
 `flake check` enables and runs both optional adapter test suites.
-
-##### Serialization with Glaze
-
-Optional [Glaze](https://github.com/stephenberry/glaze) support is available through
-`<tsl/array_hash_glaze.h>`. Glaze requires C++23, but this requirement is isolated to
-the adapter: the core `tsl::array_hash` headers and target remain C++11-compatible.
-
-The adapter uses Glaze's logical container representations rather than the library's
-internal binary serialization protocol:
-
-- `array_map<char, T>` is represented as an object/document whose property names are
-  the map keys and whose property values are serialized `T` values.
-- `array_set<char>` is represented as an array of strings.
-
-For example, with JSON:
-
-```c++
-#include <glaze/json.hpp>
-#include <tsl/array_hash_glaze.h>
-
-using map_type = tsl::array_map<char, int>;
-map_type map = {{"one", 1}, {"two", 2}};
-
-const auto json = glz::write_json(map);
-map_type restored;
-const auto error = glz::read_json(restored, json.value());
-```
-
-The adapter provides `from` / `to` customizations for JSON, JSONB, BEVE, CBOR,
-MessagePack, BSON, TOML, and YAML. EETF support is also enabled automatically when
-Glaze was built with `GLZ_ENABLE_EETF`; that optional Glaze feature requires Erlang
-libraries. CSV is not included because it is a row/column table format rather than a
-standalone object/array value format. Map and set support also applies to the
-`array_pg_map` / `array_pg_set` aliases and custom template parameters. Glaze object
-keys are UTF-8
-strings, so Glaze serialization currently requires `CharT = char`; other character
-widths remain available through the core API and the Cereal / Boost adapters.
-
-BSON requires a document at the root, so an `array_set` is stored in a BSON document
-with one `values` field containing the array. In the other formats, the set is encoded
-as a root array. The map is always encoded as a root object/document.
-
-For CMake consumers, link `tsl::array_hash` and `glaze::glaze` to targets that
-include this adapter. For a regular Git checkout, initialize the pinned Glaze
-dependency with `git submodule update --init --recursive`. Nix builds use the `glaze`
-package from nixpkgs and do not need the source submodule. To build the optional Glaze
-tests with CMake, enable `BUILD_GLAZE_TESTS`:
-
-```sh
-cmake -S . -B build -DBUILD_TESTS=ON -DBUILD_GLAZE_TESTS=ON
-cmake --build build
-ctest --test-dir build --output-on-failure
-```
-
-The Glaze tests use C++23; the existing core, Cereal, and Boost test targets retain
-their original C++11 requirements.
 
 ### License
 

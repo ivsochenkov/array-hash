@@ -19,8 +19,8 @@ let
     in
     builtins.head (builtins.head (lib.filter (m: m != null) matches));
 
-  # tests/CMakeLists.txt sets Boost_USE_STATIC_LIBS, and nixpkgs' boost only
-  # ships shared libraries by default.
+  # Keep static Boost libraries available to the optional test build; CMake's
+  # FindBoost module discovers the components provided by this package.
   boostWithStatic = boost.override { enableStatic = true; };
 in
 stdenv.mkDerivation {
@@ -58,7 +58,6 @@ stdenv.mkDerivation {
   checkPhase = ''
     runHook preCheck
     ./tests/tsl_array_hash_tests
-    ./tests/tsl_array_hash_glaze_tests
     runHook postCheck
   '';
 

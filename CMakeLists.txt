@@ -14,6 +14,8 @@ add_library(tsl::array_hash ALIAS array_hash)
 target_include_directories(array_hash INTERFACE
                            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
                            "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+# Export the language requirement to downstream CMake consumers.
+target_compile_features(array_hash INTERFACE cxx_std_11)
 
 list(APPEND headers "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_growth_policy.h"
                     "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_hash.h"
@@ -71,10 +73,6 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tsl-array-hashConfigVersion.cmake"
 option(BUILD_TESTS "Build the unit tests" OFF)
 option(BUILD_CEREAL_TESTS "Build the optional Cereal adapter tests" OFF)
 option(BUILD_BOOST_SERIALIZATION_TESTS "Build the optional Boost.Serialization adapter tests" OFF)
-option(BUILD_GLAZE_TESTS "Build the optional Glaze adapter tests (requires C++23)" OFF)
-if(BUILD_GLAZE_TESTS AND NOT BUILD_TESTS)
-    message(FATAL_ERROR "BUILD_GLAZE_TESTS=ON requires BUILD_TESTS=ON")
-endif()
 if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)

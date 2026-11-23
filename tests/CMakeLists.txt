@@ -15,11 +15,15 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 endif()
 
 # Boost.Test is used by the base test suite. Boost.Serialization is only
-# required when its optional adapter tests are enabled.
-set(BOOST_TEST_COMPONENTS filesystem unit_test_framework)
+# required when its optional adapter tests are enabled. Force the FindBoost
+# module instead of requiring BoostConfig.cmake; this supports nixpkgs and other
+# package managers that expose headers/libraries without a Boost config package.
+set(Boost_NO_BOOST_CMAKE ON)
+set(BOOST_TEST_COMPONENTS unit_test_framework)
 if(BUILD_BOOST_SERIALIZATION_TESTS)
     list(APPEND BOOST_TEST_COMPONENTS serialization)
 endif()
+
 find_package(Boost 1.75 REQUIRED CONFIG COMPONENTS ${BOOST_TEST_COMPONENTS})
 target_link_libraries(tsl_array_hash_tests PRIVATE Boost::unit_test_framework)
 

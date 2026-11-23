@@ -4,7 +4,6 @@
   cmake,
   boost,
   cereal,
-  glaze,
   # Build and run the Boost.Test suite plus all optional serialization adapter
   # test suites. Off by default so a plain `nix build` stays dependency-light.
   withTests ? false,
@@ -45,14 +44,13 @@ stdenv.mkDerivation {
   nativeBuildInputs = [ cmake ];
 
   # Nix obtains optional serialization dependencies from nixpkgs rather than
-  # initializing the Cereal and Glaze Git submodules.
-  buildInputs = lib.optionals withTests [ boostWithStatic cereal glaze ];
+  # initializing the Cereal Git submodules.
+  buildInputs = lib.optionals withTests [ boostWithStatic cereal ];
 
   cmakeFlags = [
     (lib.cmakeBool "BUILD_TESTS" withTests)
     (lib.cmakeBool "BUILD_CEREAL_TESTS" withTests)
     (lib.cmakeBool "BUILD_BOOST_SERIALIZATION_TESTS" withTests)
-    (lib.cmakeBool "BUILD_GLAZE_TESTS" withTests)
   ];
 
   doCheck = withTests;

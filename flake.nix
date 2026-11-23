@@ -35,7 +35,7 @@
       # nix develop
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
-          # Brings in cmake, Boost, Cereal, and Glaze used by optional adapter tests.
+          # Brings in cmake, Boost and Cereal used by optional adapter tests.
           inputsFrom = [ (pkgs.callPackage ./nix/default.nix { withTests = true; }) ];
 
           packages = [
@@ -49,7 +49,6 @@
           # Typical workflow inside the shell:
           #   cmake -S . -B build -DBUILD_TESTS=ON \
           #     -DBUILD_CEREAL_TESTS=ON -DBUILD_BOOST_SERIALIZATION_TESTS=ON \
-          #     -DBUILD_GLAZE_TESTS=ON
           #   cmake --build build && ctest --test-dir build --output-on-failure
         };
       });

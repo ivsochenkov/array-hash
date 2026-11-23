@@ -25,6 +25,7 @@
 #define TSL_ARRAY_HASH_CEREAL_H
 
 #include <cereal/cereal.hpp>
+#include <cereal/specialize.hpp>
 
 #include <tsl/array_map.h>
 #include <tsl/array_set.h>
@@ -125,6 +126,28 @@ void load(Archive& archive,
                        IndexSizeT, GrowthPolicy, Allocator>::deserialize(
       deserial, false, set.get_allocator());
 }
+
+// array_map and array_set already expose a member `serialize(Serializer&)`
+// for the library's callback-based binary protocol. The free save/load pair
+// above is the Cereal adapter. Explicitly select that pair so Cereal does not
+// also detect the member serialize() and report an ambiguous serializer.
+template <class Archive, class CharT, class T, class Hash, class KeyEqual,
+          bool StoreNullTerminator, class KeySizeT, class IndexSizeT,
+          class GrowthPolicy, class Allocator>
+struct specialize<
+    Archive,
+    tsl::array_map<CharT, T, Hash, KeyEqual, StoreNullTerminator, KeySizeT,
+                   IndexSizeT, GrowthPolicy, Allocator>,
+    specialization::non_member_load_save> : std::true_type {};
+
+template <class Archive, class CharT, class Hash, class KeyEqual,
+          bool StoreNullTerminator, class KeySizeT, class IndexSizeT,
+          class GrowthPolicy, class Allocator>
+struct specialize<
+    Archive,
+    tsl::array_set<CharT, Hash, KeyEqual, StoreNullTerminator, KeySizeT,
+                   IndexSizeT, GrowthPolicy, Allocator>,
+    specialization::non_member_load_save> : std::true_type {};
 
 }  // namespace cereal
 

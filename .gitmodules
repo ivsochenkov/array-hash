@@ -2,8 +2,3 @@
 	path = third_party/cereal
 	url = https://github.com/USCiLab/cereal.git
 	branch = master
-
-[submodule "third_party/glaze"]
-	path = third_party/glaze
-	url = https://github.com/stephenberry/glaze.git
-	branch = main

@@ -21,7 +21,7 @@ list(APPEND headers "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_growth_policy
                     "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_set.h"
                     "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_hash_cereal.h"
                     "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_hash_boost.h"
-                    "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_hash_glaze.h")
+)
 target_sources(array_hash INTERFACE "$<BUILD_INTERFACE:${headers}>")
 
 

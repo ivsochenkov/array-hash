@@ -16,7 +16,6 @@ endif()
 
 # Boost.Test is used by the base test suite. Boost.Serialization is only
 # required when its optional adapter tests are enabled.
-set(Boost_USE_STATIC_LIBS ON)
 set(BOOST_TEST_COMPONENTS filesystem unit_test_framework)
 if(BUILD_BOOST_SERIALIZATION_TESTS)
     list(APPEND BOOST_TEST_COMPONENTS serialization)

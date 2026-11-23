@@ -12,32 +12,37 @@ jobs:
             name: linux-x64-gcc,
             os: ubuntu-latest,
             cxx: g++,
-            cmake-build-type: Release
+            cmake-build-type: Release,
+            glaze_tests: ON
           }
         - {
             name: linux-x64-clang,
             os: ubuntu-latest,
             cxx: clang++,
-            cmake-build-type: Release
+            cmake-build-type: Release,
+            glaze_tests: OFF
           }
         - {
             name: macos-x64-gcc,
             os:  macos-latest,
             cxx: g++,
-            cmake-build-type: Release
+            cmake-build-type: Release,
+            glaze_tests: OFF
           }
         - {
             name: macos-x64-clang,
             os:  macos-latest,
             cxx: clang++,
-            cmake-build-type: Release
+            cmake-build-type: Release,
+            glaze_tests: OFF
           }
         - {
             name: linux-x64-clang-sanitize,
             os: ubuntu-latest,
             cxx: clang++,
             cxx-flags: "-fsanitize=address,undefined",
-            cmake-build-type: Release
+            cmake-build-type: Release,
+            glaze_tests: OFF
           }
         - {
             name: linux-x64-gcc-coverage,
@@ -45,7 +50,8 @@ jobs:
             cxx: g++,
             cxx-flags: --coverage,
             gcov-tool: gcov,
-            cmake-build-type: Debug
+            cmake-build-type: Debug,
+            glaze_tests: OFF
           }
         - {
             name: windows-x64-vs-2025,
@@ -53,7 +59,8 @@ jobs:
             cmake-build-type: Release,
             cmake-generator: Visual Studio 17 2022,
             cmake-platform: x64,
-            vcpkg-triplet: x64-windows-static-md
+            vcpkg-triplet: x64-windows-static-md,
+            glaze_tests: OFF
           }
         - {
             name: windows-x86-vs-2025,
@@ -61,20 +68,23 @@ jobs:
             cmake-build-type: Release,
             cmake-generator: Visual Studio 17 2022,
             cmake-platform: Win32,
-            vcpkg-triplet: x86-windows-static-md
+            vcpkg-triplet: x86-windows-static-md,
+            glaze_tests: OFF
           }
     name: ${{matrix.config.name}}
     runs-on: ${{matrix.config.os}}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
 
     # Windows
     - name: Install boost (Windows)
-      run: vcpkg install boost-test:${{matrix.config.vcpkg-triplet}}
+      run: vcpkg install boost-test:${{matrix.config.vcpkg-triplet}} boost-filesystem:${{matrix.config.vcpkg-triplet}} boost-serialization:${{matrix.config.vcpkg-triplet}}
       if: runner.os == 'Windows'
 
     - name: Configure CMake (Windows)
-      run: cmake -G "${{matrix.config.cmake-generator}}" -A ${{matrix.config.cmake-platform}} -DCMAKE_BUILD_TYPE=${{matrix.config.cmake-build-type}} -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{matrix.config.vcpkg-triplet}} -S ${{github.workspace}}/tests -B ${{github.workspace}}/build
+      run: cmake -G "${{matrix.config.cmake-generator}}" -A ${{matrix.config.cmake-platform}} -DCMAKE_BUILD_TYPE=${{matrix.config.cmake-build-type}} -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{matrix.config.vcpkg-triplet}} -DBUILD_TESTS=ON -DBUILD_CEREAL_TESTS=ON -DBUILD_BOOST_SERIALIZATION_TESTS=ON -DBUILD_GLAZE_TESTS=${{matrix.config.glaze_tests}} -S ${{github.workspace}} -B ${{github.workspace}}/build
       if: runner.os == 'Windows'
 
     - name: Build (Windows)
@@ -82,16 +92,16 @@ jobs:
       if: runner.os == 'Windows'
 
     - name: Test (Windows)
-      run: ${{github.workspace}}/build/${{matrix.config.cmake-build-type}}/tsl_array_hash_tests.exe
+      run: ctest --test-dir ${{github.workspace}}/build -C ${{matrix.config.cmake-build-type}} --output-on-failure
       if: runner.os == 'Windows'
 
     # Linux or macOS
     - name: Install boost (Linux or macOS)
-      run: vcpkg install boost-test
+      run: vcpkg install boost-test boost-filesystem boost-serialization
       if: runner.os == 'Linux' || runner.os == 'macOS'
 
     - name: Configure CMake (Linux or macOS)
-      run: cmake -DCMAKE_BUILD_TYPE=${{matrix.config.cmake-build-type}} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -S ${{github.workspace}}/tests -B ${{github.workspace}}/build
+      run: cmake -DCMAKE_BUILD_TYPE=${{matrix.config.cmake-build-type}} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DBUILD_TESTS=ON -DBUILD_CEREAL_TESTS=ON -DBUILD_BOOST_SERIALIZATION_TESTS=ON -DBUILD_GLAZE_TESTS=${{matrix.config.glaze_tests}} -S ${{github.workspace}} -B ${{github.workspace}}/build
       env:
         CXX: ${{matrix.config.cxx}}
         CXXFLAGS: ${{matrix.config.cxx-flags}}
@@ -102,7 +112,7 @@ jobs:
       if: runner.os == 'Linux' || runner.os == 'macOS'
 
     - name: Test (Linux or macOS)
-      run: ${{github.workspace}}/build/tsl_array_hash_tests
+      run: ctest --test-dir ${{github.workspace}}/build --output-on-failure
       if: runner.os == 'Linux' || runner.os == 'macOS'
 
     - name: Coverage

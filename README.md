@@ -304,111 +304,144 @@ int main() {
 }
 ```
 
-##### Serialization with Boost Serialization and compression with zlib
+##### Serialization with Cereal
 
-It's possible to use a serialization library to avoid some of the boilerplate if the types to serialize are more complex.
+Optional [Cereal](https://github.com/USCiLab/cereal) support is available by including
+`<tsl/array_hash_cereal.h>`. The adapter reuses the existing `serialize()` /
+`deserialize()` protocol, so it does not change the container's internal serialization
+format. Use a Cereal binary archive:
 
-The following example uses Boost Serialization with the Boost zlib compression stream to reduce the size of the resulting serialized file.
+```c++
+#include <cereal/archives/binary.hpp>
+#include <tsl/array_hash_cereal.h>
 
+#include <fstream>
+
+using map_type = tsl::array_map<char, int>;
+
+map_type map = {{"one", 1}, {"two", 2}};
+{
+    std::ofstream stream("array_map.cereal", std::ios::binary);
+    cereal::BinaryOutputArchive archive(stream);
+    archive(map);
+}
+
+map_type restored;
+{
+    std::ifstream stream("array_map.cereal", std::ios::binary);
+    cereal::BinaryInputArchive archive(stream);
+    archive(restored);
+}
+```
+
+The adapter supports both `array_map` and `array_set`, including the
+`array_pg_map` / `array_pg_set` aliases and custom template parameters. Cereal is
+header-only. In a regular Git checkout, initialize the pinned dependency with
+`git submodule update --init --recursive`. Nix builds use the `cereal` package from
+nixpkgs instead, so the source submodule is not needed for Nix builds.
+
+##### Serialization with Boost.Serialization
+
+Optional [Boost.Serialization](https://www.boost.org/) support is available separately
+through `<tsl/array_hash_boost.h>`. The adapter also reuses the existing binary
+serialization protocol:
 
 ```c++
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>
-#include <boost/iostreams/filter/zlib.hpp>
-#include <boost/iostreams/filtering_stream.hpp>
-#include <boost/serialization/split_free.hpp>
-#include <boost/serialization/utility.hpp>
-#include <cassert>
-#include <cstdint>
+#include <tsl/array_hash_boost.h>
+
 #include <fstream>
-#include <tsl/array_map.h>
 
+using map_type = tsl::array_map<char, int>;
 
-template<typename Archive>
-struct serializer {
-    Archive& ar;
-    
-    template<typename T>
-    void operator()(const T& val) { ar & val; }
-    
-    template<typename CharT>
-    void operator()(const CharT* val, std::size_t val_size) {
-        ar.save_binary(reinterpret_cast<const void*>(val), val_size*sizeof(CharT));
-    }   
-};
-
-template<typename Archive>
-struct deserializer {
-    Archive& ar;
-    
-    template<typename T>
-    T operator()() { T val; ar & val; return val; }
-    
-    template<typename CharT>
-    void operator()(CharT* val_out, std::size_t val_size) {
-        ar.load_binary(reinterpret_cast<void*>(val_out), val_size*sizeof(CharT));
-    }  
-};
-
-namespace boost { namespace serialization {
-template<class Archive, class CharT, class T>
-void serialize(Archive & ar, tsl::array_map<CharT, T>& map, const unsigned int version) {
-    split_free(ar, map, version); 
+map_type map = {{"one", 1}, {"two", 2}};
+{
+    std::ofstream stream("array_map.boost", std::ios::binary);
+    boost::archive::binary_oarchive archive(stream);
+    archive << map;
 }
 
-template<class Archive, class CharT, class T>
-void save(Archive & ar, const tsl::array_map<CharT, T>& map, const unsigned int version) {
-    serializer<Archive> serial{ar};
-    map.serialize(serial);
-}
-
-
-template<class Archive, class CharT, class T>
-void load(Archive & ar, tsl::array_map<CharT, T>& map, const unsigned int version) {
-    deserializer<Archive> deserial{ar};
-    map = tsl::array_map<CharT, T>::deserialize(deserial);
-}
-}}
-
-
-int main() {
-    const tsl::array_map<char32_t, std::int64_t> map = {{U"one", 1}, {U"two", 2}, 
-                                                        {U"three", 3}, {U"four", 4}};
-    
-    
-    const char* file_name = "array_map.data";
-    {
-        std::ofstream ofs;
-        ofs.exceptions(ofs.badbit | ofs.failbit);
-        ofs.open(file_name, std::ios::binary);
-        
-        boost::iostreams::filtering_ostream fo;
-        fo.push(boost::iostreams::zlib_compressor());
-        fo.push(ofs);
-        
-        boost::archive::binary_oarchive oa(fo);
-        
-        oa << map;
-    }
-    
-    {
-        std::ifstream ifs;
-        ifs.exceptions(ifs.badbit | ifs.failbit | ifs.eofbit);
-        ifs.open(file_name, std::ios::binary);
-        
-        boost::iostreams::filtering_istream fi;
-        fi.push(boost::iostreams::zlib_decompressor());
-        fi.push(ifs);
-        
-        boost::archive::binary_iarchive ia(fi);
-     
-        tsl::array_map<char32_t, std::int64_t> map_deserialized;   
-        ia >> map_deserialized;
-        
-        assert(map == map_deserialized);
-    }
+map_type restored;
+{
+    std::ifstream stream("array_map.boost", std::ios::binary);
+    boost::archive::binary_iarchive archive(stream);
+    archive >> restored;
 }
 ```
+
+Both adapters use `hash_compatible = false` when deserializing, so hashes are
+recomputed for the destination container's hash function and growth policy. The
+archive stores the container's existing serialization protocol; use the same
+`CharT` and mapped type `T` when loading. As with the low-level API, binary
+compatibility of the serialized types is the responsibility of the selected archive
+and its configuration.
+
+The two adapters are independent: include only the header for the serialization
+library used by your application. For CMake consumers, also link `cereal::cereal` or
+`Boost::serialization` as appropriate. Neither dependency is required to use
+`tsl::array_hash` itself.
+
+For developers building the optional adapter tests, enable `BUILD_CEREAL_TESTS` and/or
+`BUILD_BOOST_SERIALIZATION_TESTS` when configuring CMake. The Cereal tests use an
+installed Cereal package when available, or the `third_party/cereal` submodule. The Nix
+`flake check` enables and runs both optional adapter test suites.
+
+##### Serialization with Glaze
+
+Optional [Glaze](https://github.com/stephenberry/glaze) support is available through
+`<tsl/array_hash_glaze.h>`. Glaze requires C++23, but this requirement is isolated to
+the adapter: the core `tsl::array_hash` headers and target remain C++11-compatible.
+
+The adapter uses Glaze's logical container representations rather than the library's
+internal binary serialization protocol:
+
+- `array_map<char, T>` is represented as an object/document whose property names are
+  the map keys and whose property values are serialized `T` values.
+- `array_set<char>` is represented as an array of strings.
+
+For example, with JSON:
+
+```c++
+#include <glaze/json.hpp>
+#include <tsl/array_hash_glaze.h>
+
+using map_type = tsl::array_map<char, int>;
+map_type map = {{"one", 1}, {"two", 2}};
+
+const auto json = glz::write_json(map);
+map_type restored;
+const auto error = glz::read_json(restored, json.value());
+```
+
+The adapter provides `from` / `to` customizations for JSON, JSONB, BEVE, CBOR,
+MessagePack, BSON, TOML, and YAML. EETF support is also enabled automatically when
+Glaze was built with `GLZ_ENABLE_EETF`; that optional Glaze feature requires Erlang
+libraries. CSV is not included because it is a row/column table format rather than a
+standalone object/array value format. Map and set support also applies to the
+`array_pg_map` / `array_pg_set` aliases and custom template parameters. Glaze object
+keys are UTF-8
+strings, so Glaze serialization currently requires `CharT = char`; other character
+widths remain available through the core API and the Cereal / Boost adapters.
+
+BSON requires a document at the root, so an `array_set` is stored in a BSON document
+with one `values` field containing the array. In the other formats, the set is encoded
+as a root array. The map is always encoded as a root object/document.
+
+For CMake consumers, link `tsl::array_hash` and `glaze::glaze` to targets that
+include this adapter. For a regular Git checkout, initialize the pinned Glaze
+dependency with `git submodule update --init --recursive`. Nix builds use the `glaze`
+package from nixpkgs and do not need the source submodule. To build the optional Glaze
+tests with CMake, enable `BUILD_GLAZE_TESTS`:
+
+```sh
+cmake -S . -B build -DBUILD_TESTS=ON -DBUILD_GLAZE_TESTS=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+The Glaze tests use C++23; the existing core, Cereal, and Boost test targets retain
+their original C++11 requirements.
 
 ### License
 

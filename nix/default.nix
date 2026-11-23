@@ -3,8 +3,10 @@
   stdenv,
   cmake,
   boost,
-  # Build and run the Boost.Test suite (tests/). Off by default so that a plain
-  # `nix build` is fast and does not need Boost; `nix flake check` enables it.
+  cereal,
+  glaze,
+  # Build and run the Boost.Test suite plus all optional serialization adapter
+  # test suites. Off by default so a plain `nix build` stays dependency-light.
   withTests ? false,
 }:
 
@@ -42,10 +44,15 @@ stdenv.mkDerivation {
 
   nativeBuildInputs = [ cmake ];
 
-  buildInputs = lib.optionals withTests [ boostWithStatic ];
+  # Nix obtains optional serialization dependencies from nixpkgs rather than
+  # initializing the Cereal and Glaze Git submodules.
+  buildInputs = lib.optionals withTests [ boostWithStatic cereal glaze ];
 
   cmakeFlags = [
     (lib.cmakeBool "BUILD_TESTS" withTests)
+    (lib.cmakeBool "BUILD_CEREAL_TESTS" withTests)
+    (lib.cmakeBool "BUILD_BOOST_SERIALIZATION_TESTS" withTests)
+    (lib.cmakeBool "BUILD_GLAZE_TESTS" withTests)
   ];
 
   doCheck = withTests;
@@ -53,6 +60,7 @@ stdenv.mkDerivation {
   checkPhase = ''
     runHook preCheck
     ./tests/tsl_array_hash_tests
+    ./tests/tsl_array_hash_glaze_tests
     runHook postCheck
   '';
 

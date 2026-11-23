@@ -17,7 +17,10 @@ target_include_directories(array_hash INTERFACE
 list(APPEND headers "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_growth_policy.h"
                     "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_hash.h"
                     "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_map.h"
-                    "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_set.h")
+                    "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_set.h"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_hash_cereal.h"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_hash_boost.h"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/include/tsl/array_hash_glaze.h")
 target_sources(array_hash INTERFACE "$<BUILD_INTERFACE:${headers}>")
 
 
@@ -64,7 +67,13 @@ set(CMAKE_SIZEOF_VOID_P ${CMAKE_SIZEOF_VOID_P_BACKUP})
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tsl-array-hashConfigVersion.cmake"
         DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/cmake/tsl-array-hash")
 
-OPTION(BUILD_TESTS ON)
+option(BUILD_TESTS "Build the unit tests" OFF)
+option(BUILD_CEREAL_TESTS "Build the optional Cereal adapter tests" OFF)
+option(BUILD_BOOST_SERIALIZATION_TESTS "Build the optional Boost.Serialization adapter tests" OFF)
+option(BUILD_GLAZE_TESTS "Build the optional Glaze adapter tests (requires C++23)" OFF)
+if(BUILD_GLAZE_TESTS AND NOT BUILD_TESTS)
+    message(FATAL_ERROR "BUILD_GLAZE_TESTS=ON requires BUILD_TESTS=ON")
+endif()
 if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)

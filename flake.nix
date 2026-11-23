@@ -27,7 +27,7 @@
         default = tsl-array-hash;
       });
 
-      # nix flake check: builds the Boost.Test suite and runs it.
+      # nix flake check: builds and runs the unit and serialization adapter tests.
       checks = forAllSystems (pkgs: {
         tests = pkgs.callPackage ./nix/default.nix { withTests = true; };
       });
@@ -35,7 +35,7 @@
       # nix develop
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
-          # Brings in cmake and Boost (with static libs) used by the test suite.
+          # Brings in cmake, Boost, Cereal, and Glaze used by optional adapter tests.
           inputsFrom = [ (pkgs.callPackage ./nix/default.nix { withTests = true; }) ];
 
           packages = [
@@ -47,8 +47,10 @@
           ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.gdb ];
 
           # Typical workflow inside the shell:
-          #   cmake -S . -B build -DBUILD_TESTS=ON
-          #   cmake --build build && ./build/tests/tsl_array_hash_tests
+          #   cmake -S . -B build -DBUILD_TESTS=ON \
+          #     -DBUILD_CEREAL_TESTS=ON -DBUILD_BOOST_SERIALIZATION_TESTS=ON \
+          #     -DBUILD_GLAZE_TESTS=ON
+          #   cmake --build build && ctest --test-dir build --output-on-failure
         };
       });
     };
